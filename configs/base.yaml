@@ -1,0 +1,19 @@
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  window_size: 30
+  stride: 10
+  eval_stride: 1
+  val_ratio: 0.15
+  test_ratio: 0.15
+  n_features: 97
+
+train:
+  batch_size: 64
+  lr: 0.001
+  weight_decay: 0.00001
+  max_epochs: 100
+  patience: 10
+  device: auto
+  num_workers: 4
+  seed: 42

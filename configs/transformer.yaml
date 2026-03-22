@@ -1,0 +1,10 @@
+_base_: base.yaml
+
+model:
+  name: transformer
+  d_model: 128
+  nhead: 8
+  num_layers: 3
+  dim_feedforward: 256
+  dropout: 0.1
+  mask_ratio: 0.15

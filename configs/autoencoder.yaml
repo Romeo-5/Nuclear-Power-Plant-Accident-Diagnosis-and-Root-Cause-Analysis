@@ -1,0 +1,7 @@
+_base_: base.yaml
+
+model:
+  name: autoencoder
+  hidden_dims: [64, 32]
+  latent_dim: 16
+  dropout: 0.2

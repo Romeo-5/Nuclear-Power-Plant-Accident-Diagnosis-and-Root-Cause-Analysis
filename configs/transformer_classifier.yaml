@@ -1,0 +1,16 @@
+_base_: base.yaml
+
+model:
+  name: transformer_classifier
+  n_classes: 18
+  d_model: 128
+  nhead: 8
+  num_layers: 3
+  dim_feedforward: 256
+  dropout: 0.1
+
+train:
+  lr: 0.0005
+  max_epochs: 100
+  patience: 15
+  batch_size: 64

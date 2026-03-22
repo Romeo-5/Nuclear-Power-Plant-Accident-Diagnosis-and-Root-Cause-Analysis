@@ -33,6 +33,10 @@ class ModelConfig:
     nhead: int = 8
     dim_feedforward: int = 256
     mask_ratio: float = 0.15
+    # CNN Classifier
+    channels: list[int] = field(default_factory=lambda: [64, 128, 256])
+    # Classification
+    n_classes: int = 18
     # Shared
     dropout: float = 0.2
 

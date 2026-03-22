@@ -61,11 +61,18 @@ python data/scripts/download.py
 python data/scripts/preprocess.py
 ```
 
-### 3. Train
+### 3. Train Anomaly Detectors (Module 1)
 ```bash
 python scripts/train.py --config configs/autoencoder.yaml
 python scripts/train.py --config configs/lstm.yaml
 python scripts/train.py --config configs/transformer.yaml
+```
+
+### 4. Train Accident Classifiers (Module 2)
+```bash
+python scripts/train_classifier.py --config configs/cnn_classifier.yaml
+python scripts/train_classifier.py --config configs/lstm_classifier.yaml
+python scripts/train_classifier.py --config configs/transformer_classifier.yaml
 ```
 
 ## Results
@@ -88,12 +95,34 @@ All three architectures achieve near-perfect binary anomaly detection. The stron
 - Early stopping with patience=10 on validation loss
 - Hardware: Apple M-series GPU (MPS backend)
 
+### Module 2: Accident Classification & Root Cause Analysis
+
+Supervised multi-class classification across 18 accident types (LOCA, SGTR, steam line break, rod withdrawal, etc.). Trained on all 32,284 windows, evaluated on 7,316 test windows.
+
+| Model | Accuracy | F1 (macro) | F1 (weighted) | Precision (macro) | Recall (macro) |
+|-------|----------|------------|---------------|-------------------|----------------|
+| CNN | 0.524 | 0.421 | 0.443 | 0.448 | 0.462 |
+| **LSTM (bidirectional)** | **0.712** | **0.572** | **0.676** | **0.661** | **0.578** |
+| Transformer (CLS token) | 0.707 | 0.538 | 0.662 | 0.538 | 0.582 |
+
+The LSTM classifier achieves the best overall performance. Per-class analysis reveals:
+- **Near-perfect** (F1 > 0.95): LLB, LR, MD, SLBOC, Normal
+- **Strong** (F1 > 0.7): SLBIC, SGBTR
+- **Challenging** (F1 < 0.5): LOCA/LOCAC confusion, SGATR, RW, low-sample classes (LACP, ATWS, SP)
+
+The lower macro-F1 reflects class imbalance — some accident types have as few as 28-56 training windows vs 3,000+ for others. Root cause analysis via gradient attribution identifies the top contributing sensors per accident type (see `notebooks/04_evaluate_classification.ipynb`).
+
+**Training details:**
+- Supervised on all data (accident_type labels)
+- 1D-CNN, bidirectional LSTM, and Transformer with [CLS] token
+- Early stopping with patience=15
+
 ## Module Status
 
 | Module | Status | Description |
 |--------|--------|-------------|
 | Anomaly Detection | Complete | Semi-supervised detection using reconstruction/prediction error |
-| Accident Classification | In Progress | Multi-class classifier with SHAP interpretability |
+| Accident Classification | Complete | Multi-class classifier with gradient-based root cause analysis |
 | Digital Twin | Planned | Physics-informed neural network surrogate model |
 
 ## Tech Stack

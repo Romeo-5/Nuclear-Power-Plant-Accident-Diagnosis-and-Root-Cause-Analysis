@@ -1,0 +1,13 @@
+_base_: base.yaml
+
+model:
+  name: cnn_classifier
+  n_classes: 18
+  channels: [64, 128, 256]
+  dropout: 0.3
+
+train:
+  lr: 0.001
+  max_epochs: 100
+  patience: 15
+  batch_size: 64

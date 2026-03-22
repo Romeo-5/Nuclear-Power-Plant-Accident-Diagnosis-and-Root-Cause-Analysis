@@ -13,27 +13,43 @@ from sklearn.preprocessing import StandardScaler
 from src.utils.config import Config
 
 
-# Mapping from directory/file naming conventions to accident types
+# Mapping from actual directory names to accident type indices
 ACCIDENT_TYPES = {
     "Normal": 0,
     "LOCA": 1,      # Loss of Coolant Accident
-    "SLBIC": 2,     # Steam Line Break Inside Containment
-    "SLBOC": 3,     # Steam Line Break Outside Containment
-    "SGTR": 4,      # Steam Generator Tube Rupture
-    "MSLB": 5,      # Main Steam Line Break
-    "LOFW": 6,      # Loss of Feedwater
-    "LOCV": 7,      # Loss of Condenser Vacuum
-    "LOOP": 8,      # Loss of Offsite Power
+    "LOCAC": 2,     # Loss of Coolant Accident (Cold leg)
+    "SLBIC": 3,     # Steam Line Break Inside Containment
+    "SLBOC": 4,     # Steam Line Break Outside Containment
+    "SGATR": 5,     # Steam Generator A Tube Rupture
+    "SGBTR": 6,     # Steam Generator B Tube Rupture
+    "FLB": 7,       # Feedwater Line Break
+    "LLB": 8,       # Large Line Break
     "RW": 9,        # Rod Withdrawal
-    "RWAP": 10,     # Rod Withdrawal at Power
-    "RWAS": 11,     # Rod Withdrawal at Startup
-    "BE": 12,       # Boron Dilution Event
-    "RI": 13,       # Rod Insertion
-    "FLB": 14,      # Feedwater Line Break
-    "LR": 15,       # Load Rejection
-    "TT": 16,       # Turbine Trip
-    "RCP": 17,      # Reactor Coolant Pump
+    "RI": 10,       # Rod Insertion
+    "LR": 11,       # Load Rejection
+    "TT": 12,       # Turbine Trip
+    "MD": 13,       # Malfunction of equipment / Misdiagnosis
+    "LOF": 14,      # Loss of Flow
+    "LACP": 15,     # Loss of AC Power
+    "ATWS": 16,     # Anticipated Transient Without Scram
+    "SP": 17,       # Station Power
 }
+
+# Use the 96 known feature columns (excluding TIME) for consistency
+FEATURE_COLUMNS = [
+    "P", "TAVG", "THA", "THB", "TCA", "TCB", "WRCA", "WRCB",
+    "PSGA", "PSGB", "WFWA", "WFWB", "WSTA", "WSTB", "VOL", "LVPZ",
+    "VOID", "WLR", "WUP", "HUP", "HLW", "WHPI", "WECS", "QMWT",
+    "LSGA", "LSGB", "QMGA", "QMGB", "NSGA", "NSGB", "TBLD", "WTRA",
+    "WTRB", "TSAT", "QRHR", "LVCR", "SCMA", "SCMB", "FRCL", "PRB",
+    "PRBA", "TRB", "LWRB", "DNBR", "QFCL", "WBK", "WSPY", "WCSP",
+    "HTR", "MH2", "CNH2", "RHBR", "RHMT", "RHFL", "RHRD", "RH",
+    "PWNT", "PWR", "TFSB", "TFPK", "TF", "TPCT", "WCFT", "WLPI",
+    "WCHG", "RM1", "RM2", "RM3", "RM4", "RC87", "RC131", "STRB",
+    "STSG", "STTB", "RBLK", "SGLK", "DTHY", "DWB", "WRLA", "WRLB",
+    "WLD", "MBK", "EBK", "TKLV", "FRZR", "TDBR", "MDBR", "MCRT",
+    "MGAS", "TCRT", "TSLP", "PPM", "RRCA", "RRCB", "RRCO", "WFLB",
+]
 
 
 def find_csv_files(raw_dir: Path) -> list[dict]:
@@ -46,61 +62,69 @@ def find_csv_files(raw_dir: Path) -> list[dict]:
             f"NPPAD data not found at {nppad_dir}. Run download.py first."
         )
 
-    # Search for CSV files in the Operation_csv_data directory
-    csv_dirs = list(nppad_dir.rglob("Operation_csv_data"))
-    if not csv_dirs:
-        # Fallback: search for any CSV files
-        csv_dirs = [nppad_dir]
+    op_csv_dir = nppad_dir / "Operation_csv_data"
+    if not op_csv_dir.exists():
+        raise FileNotFoundError(
+            f"Operation_csv_data not found at {op_csv_dir}"
+        )
 
-    for csv_dir in csv_dirs:
-        for csv_path in sorted(csv_dir.rglob("*.csv")):
-            # Extract accident type from path
-            accident_type = _infer_accident_type(csv_path)
-            records.append({
-                "path": csv_path,
-                "accident_type": accident_type,
-                "scenario_id": csv_path.stem,
-            })
+    for csv_path in sorted(op_csv_dir.rglob("*.csv")):
+        accident_type = csv_path.parent.name
+        if accident_type not in ACCIDENT_TYPES:
+            print(f"Warning: unknown accident type directory '{accident_type}', skipping")
+            continue
+        records.append({
+            "path": csv_path,
+            "accident_type": accident_type,
+            "scenario_id": f"{accident_type}_{csv_path.stem}",
+        })
 
-    print(f"Found {len(records)} CSV files across {len(set(r['accident_type'] for r in records))} accident types")
+    types_found = set(r["accident_type"] for r in records)
+    print(f"Found {len(records)} CSV files across {len(types_found)} accident types")
+    print(f"Types: {sorted(types_found)}")
     return records
 
 
-def _infer_accident_type(csv_path: Path) -> str:
-    """Infer accident type from file path components."""
-    path_str = str(csv_path).upper()
-    for accident_name in ACCIDENT_TYPES:
-        if accident_name.upper() in path_str:
-            return accident_name
-    return "Normal"
-
-
 def load_and_concat(records: list[dict]) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Load all CSVs and concatenate with metadata."""
+    """Load all CSVs and concatenate with metadata, using consistent columns."""
     dfs = []
     metadata_rows = []
+    skipped = 0
 
     for rec in records:
         try:
             df = pd.read_csv(rec["path"])
         except Exception as e:
             print(f"Warning: could not read {rec['path']}: {e}")
+            skipped += 1
             continue
 
-        # Add scenario tracking
-        n_rows = len(df)
+        # Use only the known feature columns that exist in this file
+        available = [c for c in FEATURE_COLUMNS if c in df.columns]
+        if len(available) < len(FEATURE_COLUMNS):
+            # Add missing columns as zeros
+            for c in FEATURE_COLUMNS:
+                if c not in df.columns:
+                    df[c] = 0.0
+
+        df_features = df[FEATURE_COLUMNS]
+
+        n_rows = len(df_features)
         meta = pd.DataFrame({
             "scenario_id": [rec["scenario_id"]] * n_rows,
             "accident_type": [rec["accident_type"]] * n_rows,
         })
 
-        dfs.append(df)
+        dfs.append(df_features)
         metadata_rows.append(meta)
+
+    if skipped:
+        print(f"Skipped {skipped} unreadable files")
 
     data = pd.concat(dfs, ignore_index=True)
     metadata = pd.concat(metadata_rows, ignore_index=True)
 
-    print(f"Loaded {len(data)} total timesteps, {data.shape[1]} columns")
+    print(f"Loaded {len(data)} total timesteps, {data.shape[1]} features")
     return data, metadata
 
 
@@ -113,13 +137,9 @@ def preprocess(
     processed_dir = Path(config.data.processed_dir)
     processed_dir.mkdir(parents=True, exist_ok=True)
 
-    # Drop non-numeric and time columns
-    numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
-    time_cols = [c for c in numeric_cols if c.upper() in ("TIME", "T", "TIME(S)", "TIME (S)")]
-    feature_cols = [c for c in numeric_cols if c not in time_cols]
-
-    print(f"Using {len(feature_cols)} numeric feature columns")
-    features = data[feature_cols].values.astype(np.float32)
+    features = data.values.astype(np.float32)
+    n_features = features.shape[1]
+    print(f"Using {n_features} features")
 
     # Handle NaN/inf
     features = np.nan_to_num(features, nan=0.0, posinf=0.0, neginf=0.0)
@@ -129,6 +149,7 @@ def preprocess(
     scaler = StandardScaler()
     if is_normal.any():
         scaler.fit(features[is_normal])
+        print(f"Scaler fit on {is_normal.sum()} normal timesteps")
     else:
         print("Warning: no normal data found, fitting scaler on all data")
         scaler.fit(features)
@@ -138,18 +159,22 @@ def preprocess(
     # Save scaler
     with open(processed_dir / "scaler.pkl", "wb") as f:
         pickle.dump(scaler, f)
-    print(f"Scaler saved to {processed_dir / 'scaler.pkl'}")
 
-    # Create sliding windows per scenario
+    # Split ACCIDENT scenarios into train/val/test (not the Normal scenario)
     scenarios = metadata["scenario_id"].unique()
     scenario_types = {
         sid: metadata[metadata["scenario_id"] == sid]["accident_type"].iloc[0]
         for sid in scenarios
     }
 
-    # Split scenarios into train/val/test
+    normal_scenarios = [s for s in scenarios if scenario_types[s] == "Normal"]
+    accident_scenarios = np.array([s for s in scenarios if scenario_types[s] != "Normal"])
+
+    print(f"Normal scenarios: {len(normal_scenarios)}, Accident scenarios: {len(accident_scenarios)}")
+
+    # Split accident scenarios
     train_scenarios, temp_scenarios = train_test_split(
-        scenarios,
+        accident_scenarios,
         test_size=config.data.val_ratio + config.data.test_ratio,
         random_state=config.train.seed,
     )
@@ -160,18 +185,24 @@ def preprocess(
         random_state=config.train.seed,
     )
 
+    # Add normal data to all splits
+    train_scenarios = np.concatenate([train_scenarios, normal_scenarios])
+    val_scenarios = np.concatenate([val_scenarios, normal_scenarios])
+    test_scenarios = np.concatenate([test_scenarios, normal_scenarios])
+
     print(f"Split: {len(train_scenarios)} train, {len(val_scenarios)} val, {len(test_scenarios)} test scenarios")
 
-    n_features = features_scaled.shape[1]
+    # Create windows for each split
+    stride = config.data.stride  # Use same stride for all splits to keep sizes manageable
     splits = {}
-    for split_name, split_scenarios, stride in [
-        ("train", train_scenarios, config.data.stride),
-        ("val", val_scenarios, config.data.eval_stride),
-        ("test", test_scenarios, config.data.eval_stride),
+    for split_name, split_scenarios in [
+        ("train", train_scenarios),
+        ("val", val_scenarios),
+        ("test", test_scenarios),
     ]:
         windows = []
         labels = []
-        accident_types = []
+        accident_types_list = []
 
         for sid in split_scenarios:
             mask = (metadata["scenario_id"] == sid).values
@@ -183,21 +214,23 @@ def preprocess(
                 window = scenario_data[start : start + config.data.window_size]
                 windows.append(window)
                 labels.append(is_anomaly)
-                accident_types.append(ACCIDENT_TYPES.get(atype, -1))
+                accident_types_list.append(ACCIDENT_TYPES.get(atype, -1))
 
         if windows:
             splits[split_name] = {
                 "windows": torch.tensor(np.array(windows), dtype=torch.float32),
                 "labels": torch.tensor(labels, dtype=torch.long),
-                "accident_types": torch.tensor(accident_types, dtype=torch.long),
+                "accident_types": torch.tensor(accident_types_list, dtype=torch.long),
             }
-            print(f"{split_name}: {len(windows)} windows, shape {splits[split_name]['windows'].shape}")
+            n_normal = sum(1 for l in labels if l == 0)
+            n_anomaly = sum(1 for l in labels if l == 1)
+            print(
+                f"{split_name}: {len(windows)} windows "
+                f"({n_normal} normal, {n_anomaly} anomaly), "
+                f"shape {splits[split_name]['windows'].shape}"
+            )
         else:
             print(f"Warning: no windows created for {split_name} split")
-
-    # Save feature column names
-    splits["feature_names"] = feature_cols
-    splits["n_features"] = n_features
 
     # Save splits
     for split_name in ("train", "val", "test"):
@@ -208,7 +241,7 @@ def preprocess(
 
     # Save metadata
     torch.save(
-        {"feature_names": feature_cols, "n_features": n_features},
+        {"feature_names": FEATURE_COLUMNS, "n_features": n_features},
         processed_dir / "metadata.pt",
     )
 

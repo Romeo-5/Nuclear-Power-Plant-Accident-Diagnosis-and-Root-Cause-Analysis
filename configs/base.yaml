@@ -6,7 +6,7 @@ data:
   eval_stride: 1
   val_ratio: 0.15
   test_ratio: 0.15
-  n_features: 97
+  n_features: 96
 
 train:
   batch_size: 64

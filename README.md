@@ -7,8 +7,8 @@ Exploring ML methods for nuclear power plant fault diagnosis and root cause anal
 This project applies deep learning to time-series sensor data from pressurized water reactor (PWR) simulations to:
 
 1. **Anomaly Detection** — Monitor reactor sensor streams and flag deviations from normal operating conditions using autoencoders, LSTMs, and transformers
-2. **Accident Classification & Root Cause Analysis** — Classify flagged anomalies into accident types with interpretability via SHAP/attention visualization *(in progress)*
-3. **Physics-Informed Digital Twin** — Surrogate model approximating reactor dynamics with physics-informed loss constraints *(planned)*
+2. **Accident Classification & Root Cause Analysis** — Classify flagged anomalies into accident types with interpretability via SHAP/attention visualization 
+3. **Physics-Informed Digital Twin** — Surrogate model approximating reactor dynamics with physics-informed loss constraints 
 
 ## Dataset
 
@@ -61,21 +61,21 @@ python data/scripts/download.py
 python data/scripts/preprocess.py
 ```
 
-### 3. Train Anomaly Detectors (Module 1)
+### 3. Train Anomaly Detectors
 ```bash
 python scripts/train.py --config configs/autoencoder.yaml
 python scripts/train.py --config configs/lstm.yaml
 python scripts/train.py --config configs/transformer.yaml
 ```
 
-### 4. Train Accident Classifiers (Module 2)
+### 4. Train Accident Classifiers
 ```bash
 python scripts/train_classifier.py --config configs/cnn_classifier.yaml
 python scripts/train_classifier.py --config configs/lstm_classifier.yaml
 python scripts/train_classifier.py --config configs/transformer_classifier.yaml
 ```
 
-### 5. Train Digital Twin (Module 3)
+### 5. Train Digital Twin
 ```bash
 python scripts/train_digital_twin.py --config configs/digital_twin.yaml
 python scripts/train_digital_twin.py --config configs/digital_twin_no_physics.yaml  # ablation baseline

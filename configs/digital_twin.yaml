@@ -1,0 +1,22 @@
+_base_: base.yaml
+
+model:
+  name: digital_twin
+  hidden_dim: 128
+  num_layers: 2
+  dropout: 0.2
+  prediction_horizon: 10
+
+physics:
+  lambda_data: 1.0
+  lambda_physics: 0.1
+  lambda_conservation: 0.05
+  lambda_bounds: 0.01
+  warmup_steps: 500
+  dt: 1.0
+
+train:
+  lr: 0.0005
+  max_epochs: 150
+  patience: 15
+  batch_size: 64

@@ -37,8 +37,20 @@ class ModelConfig:
     channels: list[int] = field(default_factory=lambda: [64, 128, 256])
     # Classification
     n_classes: int = 18
+    # Digital Twin
+    prediction_horizon: int = 10
     # Shared
     dropout: float = 0.2
+
+
+@dataclass
+class PhysicsConfig:
+    lambda_data: float = 1.0
+    lambda_physics: float = 0.1
+    lambda_conservation: float = 0.05
+    lambda_bounds: float = 0.01
+    warmup_steps: int = 500
+    dt: float = 1.0
 
 
 @dataclass
@@ -58,6 +70,7 @@ class Config:
     data: DataConfig = field(default_factory=DataConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
     train: TrainConfig = field(default_factory=TrainConfig)
+    physics: PhysicsConfig = field(default_factory=PhysicsConfig)
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "Config":
@@ -66,20 +79,31 @@ class Config:
         with open(path) as f:
             raw = yaml.safe_load(f)
 
-        # Handle base config inheritance
+        # Handle base config inheritance (recursive)
         base_name = raw.pop("_base_", None)
         if base_name:
             base_path = path.parent / base_name
-            with open(base_path) as f:
-                base_raw = yaml.safe_load(f)
-            base_raw = _deep_merge(base_raw, raw)
-            raw = base_raw
+            base_raw = _load_yaml_recursive(base_path)
+            raw = _deep_merge(base_raw, raw)
 
         return cls(
             data=_from_dict(DataConfig, raw.get("data", {})),
             model=_from_dict(ModelConfig, raw.get("model", {})),
             train=_from_dict(TrainConfig, raw.get("train", {})),
+            physics=_from_dict(PhysicsConfig, raw.get("physics", {})),
         )
+
+
+def _load_yaml_recursive(path: Path) -> dict:
+    """Load a YAML file, recursively resolving _base_ inheritance."""
+    with open(path) as f:
+        raw = yaml.safe_load(f)
+    base_name = raw.pop("_base_", None)
+    if base_name:
+        base_path = path.parent / base_name
+        base_raw = _load_yaml_recursive(base_path)
+        raw = _deep_merge(base_raw, raw)
+    return raw
 
 
 def _from_dict(cls: type, d: dict[str, Any]) -> Any:

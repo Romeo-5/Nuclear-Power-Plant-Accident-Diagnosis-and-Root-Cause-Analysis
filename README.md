@@ -7,8 +7,8 @@ Exploring ML methods for nuclear power plant fault diagnosis and root cause anal
 This project applies deep learning to time-series sensor data from pressurized water reactor (PWR) simulations to:
 
 1. **Anomaly Detection** — Monitor reactor sensor streams and flag deviations from normal operating conditions using autoencoders, LSTMs, and transformers
-2. **Accident Classification & Root Cause Analysis** — Classify flagged anomalies into accident types with interpretability via SHAP/attention visualization *(in progress)*
-3. **Physics-Informed Digital Twin** — Surrogate model approximating reactor dynamics with physics-informed loss constraints *(planned)*
+2. **Accident Classification & Root Cause Analysis** — Classify flagged anomalies into accident types with interpretability via SHAP/attention visualization
+3. **Physics-Informed Digital Twin** — Surrogate model approximating reactor dynamics with physics-informed loss constraints
 
 ## Dataset
 
@@ -75,9 +75,15 @@ python scripts/train_classifier.py --config configs/lstm_classifier.yaml
 python scripts/train_classifier.py --config configs/transformer_classifier.yaml
 ```
 
+### 5. Train Digital Twin (Module 3)
+```bash
+python scripts/train_digital_twin.py --config configs/digital_twin.yaml
+python scripts/train_digital_twin.py --config configs/digital_twin_no_physics.yaml  # ablation baseline
+```
+
 ## Results
 
-### Module 1: Anomaly Detection
+### 1: Anomaly Detection
 
 Semi-supervised approach — models trained on normal operating data only (302 timesteps), evaluated on 7,316 test windows across 18 accident types. Anomalies are detected via reconstruction/prediction error exceeding a threshold optimized on the validation set.
 
@@ -95,7 +101,7 @@ All three architectures achieve near-perfect binary anomaly detection. The stron
 - Early stopping with patience=10 on validation loss
 - Hardware: Apple M-series GPU (MPS backend)
 
-### Module 2: Accident Classification & Root Cause Analysis
+### 2: Accident Classification & Root Cause Analysis
 
 Supervised multi-class classification across 18 accident types (LOCA, SGTR, steam line break, rod withdrawal, etc.). Trained on all 32,284 windows, evaluated on 7,316 test windows.
 
@@ -117,13 +123,32 @@ The lower macro-F1 reflects class imbalance — some accident types have as few 
 - 1D-CNN, bidirectional LSTM, and Transformer with [CLS] token
 - Early stopping with patience=15
 
-## Module Status
+### 3: Physics-Informed Digital Twin
 
-| Module | Status | Description |
-|--------|--------|-------------|
-| Anomaly Detection | Complete | Semi-supervised detection using reconstruction/prediction error |
-| Accident Classification | Complete | Multi-class classifier with gradient-based root cause analysis |
-| Digital Twin | Planned | Physics-informed neural network surrogate model |
+GRU encoder-decoder surrogate model that predicts future reactor states from a context window, constrained by reactor physics. Compares a physics-informed model (point kinetics + energy conservation constraints) against a data-only baseline. Trained on 32,284 windows, evaluated on 7,316 test windows.
+
+**Architecture:** GRU encoder (context window) → GRU decoder (autoregressive) with residual connection. 384K parameters.
+
+| Metric | Physics-Informed | Data-Only Baseline |
+|--------|-----------------|-------------------|
+| Physics Residual (point kinetics) | 3,739 | 11,888 |
+| Conservation Violation (MW) | 1,783 | 2,950 |
+| Physics Residual Reduction | **68.6%** | — |
+| Conservation Violation Reduction | **39.6%** | — |
+
+The physics-informed model produces predictions significantly more consistent with point reactor kinetics equations and energy conservation laws, while maintaining comparable data-fitting accuracy. The key insight is that physics constraints act as a regularizer — they don't improve raw MSE much but ensure predictions respect physical laws (positive pressure/power, energy balance, neutron kinetics consistency).
+
+**Physics constraints:**
+1. **Point kinetics residual** — dn/dt consistency with simplified neutron kinetics ODE
+2. **Energy conservation** — Q ≈ W · Cp · (T_hot - T_cold) energy balance
+3. **Physical bounds** — soft penalties for negative pressure, power, temperature, flow, boron
+4. **Warmup schedule** — physics terms ramp from 0 to full weight over 500 training steps
+
+**Training details:**
+- GRU encoder-decoder with residual connection (predictions = last_state + delta)
+- Context: 20 timesteps → Predict: 10 timesteps ahead
+- Learning rate: 5e-4, 150 epochs, patience: 15
+- Hardware: Apple M-series GPU (MPS backend)
 
 ## Tech Stack
 

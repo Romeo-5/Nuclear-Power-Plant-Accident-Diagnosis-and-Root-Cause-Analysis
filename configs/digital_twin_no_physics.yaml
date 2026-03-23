@@ -1,0 +1,9 @@
+_base_: digital_twin.yaml
+
+model:
+  name: digital_twin_no_physics
+
+physics:
+  lambda_physics: 0.0
+  lambda_conservation: 0.0
+  lambda_bounds: 0.0

@@ -7,8 +7,8 @@ Exploring ML methods for nuclear power plant fault diagnosis and root cause anal
 This project applies deep learning to time-series sensor data from pressurized water reactor (PWR) simulations to:
 
 1. **Anomaly Detection** — Monitor reactor sensor streams and flag deviations from normal operating conditions using autoencoders, LSTMs, and transformers
-2. **Accident Classification & Root Cause Analysis** — Classify flagged anomalies into accident types with interpretability via SHAP/attention visualization
-3. **Physics-Informed Digital Twin** — Surrogate model approximating reactor dynamics with physics-informed loss constraints
+2. **Accident Classification & Root Cause Analysis** — Classify flagged anomalies into accident types with interpretability via SHAP/attention visualization *(in progress)*
+3. **Physics-Informed Digital Twin** — Surrogate model approximating reactor dynamics with physics-informed loss constraints *(planned)*
 
 ## Dataset
 

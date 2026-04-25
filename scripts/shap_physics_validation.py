@@ -246,6 +246,11 @@ def main() -> None:
     parser.add_argument("--output-dir", type=str, default="results/shap")
     parser.add_argument("--device", type=str, default="cpu",
                         help="cpu | cuda | mps.")
+    parser.add_argument("--method", type=str, default="gradient",
+                        choices=["gradient", "deep"],
+                        help=("SHAP backend. 'gradient' (default) avoids the cuDNN-RNN-eval-mode "
+                              "error and works on any nn.Module; 'deep' uses DeepExplainer with "
+                              "cuDNN auto-disabled around the call."))
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
 
@@ -307,10 +312,12 @@ def main() -> None:
     print(
         f"[shap] Computing SHAP values on {concat.shape[0]} windows "
         f"({', '.join(f'{c}={t.shape[0]}' for c, t in per_class_windows.items())}) "
-        f"with background size {background.shape[0]} on {args.device}."
+        f"with background size {background.shape[0]} on {args.device} "
+        f"using {args.method} method."
     )
     shap_values = compute_shap_values(
-        model, concat, background=background, device=args.device
+        model, concat, background=background, device=args.device,
+        method=args.method,
     )
 
     # shap_values is a list of length n_classes; each entry has shape (N, T, F).

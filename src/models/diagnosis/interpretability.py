@@ -17,10 +17,9 @@ def compute_shap_values(
     background: torch.Tensor | None = None,
     n_background: int = 50,
     device: str = "cpu",
+    method: str = "gradient",
 ):
     """Compute SHAP values for accident classification predictions.
-
-    Uses DeepExplainer for neural network models.
 
     Args:
         model: Trained classifier
@@ -28,6 +27,13 @@ def compute_shap_values(
         background: Background dataset for SHAP. If None, uses first n_background from data
         n_background: Number of background samples
         device: Device for computation
+        method: "gradient" (default) or "deep".
+            - "gradient" uses GradientExplainer (expected gradients). Works for
+              any nn.Module including LSTMs, has no cuDNN issues, and tends to
+              be faster on recurrent architectures.
+            - "deep" uses DeepExplainer (DeepLIFT-style). Will hit a cuDNN
+              "RNN backward in eval mode" error on CUDA + LSTM unless cuDNN is
+              disabled (torch.backends.cudnn.enabled = False).
 
     Returns:
         shap_values: list of arrays, one per class, each (N, window_size, n_features)
@@ -43,8 +49,31 @@ def compute_shap_values(
     background = background.to(device)
     data = data.to(device)
 
-    explainer = shap.DeepExplainer(model, background)
-    shap_values = explainer.shap_values(data)
+    if method == "gradient":
+        explainer = shap.GradientExplainer(model, background)
+        shap_values = explainer.shap_values(data)
+    elif method == "deep":
+        # DeepExplainer's PyTorch backend calls cuDNN RNN backward through
+        # an eval()'d model, which raises RuntimeError. Disable cuDNN for
+        # the duration of the call so the fallback PyTorch RNN kernel runs.
+        prev = torch.backends.cudnn.enabled
+        try:
+            torch.backends.cudnn.enabled = False
+            explainer = shap.DeepExplainer(model, background)
+            shap_values = explainer.shap_values(data)
+        finally:
+            torch.backends.cudnn.enabled = prev
+    else:
+        raise ValueError(f"Unknown SHAP method: {method!r}. Use 'gradient' or 'deep'.")
+
+    # GradientExplainer with multi-output models can return either a list-per-class
+    # or a single ndarray with a trailing class axis depending on shap version.
+    # Normalize to the list-per-class shape that the rest of the script expects.
+    if isinstance(shap_values, np.ndarray):
+        if shap_values.ndim == data.ndim + 1:
+            shap_values = [shap_values[..., c] for c in range(shap_values.shape[-1])]
+        else:
+            shap_values = [shap_values]
 
     return shap_values
 

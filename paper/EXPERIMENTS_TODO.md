@@ -1,165 +1,87 @@
 # Experiments TODO — Path 1 Paper
 
-Punch list of code/experiments that must run before the paper can be submitted.
-Each item lists: (a) what the paper needs, (b) what to run, (c) where the output
-should land, (d) which section/figure/table in `paper/sections/` it fills.
-
-Grep for `\placeholder` in `paper/sections/` to see the matching orange markers.
+Punch list of remaining work before submission. Items marked ✅ are complete.
 
 ---
 
-## 1. SHAP physics-validation on LOCA / SGTR / FLB
+## ✅ Done (figures and numbers integrated into the LaTeX)
 
-**Paper target:** Table 3 (`sec:results-shap`) rows 1–3; Figure 4 (temporal SHAP).
+| Item | Result | Where it lives in the paper |
+|---|---|---|
+| Figure 2 — per-class F1 vs. frequency | `paper/figures/fig2_f1_vs_frequency.pdf` | §5.2 |
+| Figure 3 — confusion matrix | `paper/figures/fig3_confusion.pdf` | §5.2 |
+| Figure 5 — LOCA trajectory comparison | `paper/figures/fig5_trajectory_loca.pdf` | §5.4 |
+| Figure 6 — physics-residual histograms | `paper/figures/fig6_residual_histograms.pdf` | §5.4 |
+| Figure 7 — κ distribution | `paper/figures/fig7_kappa_distributions.pdf` | §5.5 |
+| Table 5 — pipeline cross-validation precision/recall/F1 | `results/pipeline/xvalidation_table.tex` (precision $0.362$, recall $0.105$, F1 $0.163$ at $\kappa^\star = 1.41$) | §5.5 |
+| KS test on κ distributions | `results/pipeline/kappa_stats.json` ($D = 0.634$, $p < 10^{-300}$) | §5.5 |
+| Per-class commentary updated for actual results (LOCA $\rightarrow$ LOCAC attractor at $95\%$, RW $\rightarrow$ LOCAC at $93\%$, classes with zero predictions called out) | — | §5.2 |
 
-**Script:** `scripts/shap_physics_validation.py` (added in this turn).
+---
 
-**Run:**
+## ⏳ Remaining (in priority order)
+
+### 1. SHAP physics-validation run (Table 3 + Figure 4)
+
+**Status:** the SHAP run did not complete on Colab — `results/shap/` is empty in the returned archive. This is the only remaining experimental gap.
+
+**Run on Colab GPU (3–5 min on T4):**
 ```bash
-# Assumes you have a trained LSTM classifier checkpoint
 python scripts/shap_physics_validation.py \
     --config configs/lstm_classifier.yaml \
-    --checkpoint checkpoints/lstm_classifier/best.pt \
+    --checkpoint checkpoints/lstm_classifier_best.pt \
     --classes LOCA SGATR SGBTR FLB \
-    --n-samples 100 \
-    --n-background 100 \
+    --n-samples 100 --n-background 100 \
+    --device cuda \
     --output-dir results/shap
 ```
 
-**Outputs:**
-- `results/shap/feature_importance_<CLASS>.csv` — per-sensor SHAP rankings per class.
-- `results/shap/group_importance_<CLASS>.csv` — physical-group rollup.
-- `results/shap/temporal_importance_<CLASS>.csv` — per-timestep importance.
-- `results/shap/summary_table.tex` — LaTeX-ready Table 3 fragment. Drop directly into `sections/05_results.tex` in place of the three placeholder rows.
-- `results/shap/temporal_plot.pdf` — Figure 4 contents. Save as `paper/figures/fig4_shap_temporal.pdf` and `\includegraphics{figures/fig4_shap_temporal}` in `sections/05_results.tex`.
+**Then:**
+- Drop `results/shap/temporal_plot.pdf` into `paper/figures/fig4_shap_temporal.pdf`.
+- Replace the Figure 4 placeholder in `sections/05_results.tex` with `\includegraphics{figures/fig4_shap_temporal}`.
+- Drop the rows from `results/shap/summary_table.tex` into Table 3 in place of the `\placeholder{...}` cells.
 
-**Paper edits:** replace the three `\placeholder{run SHAP: ...}` cells in the Table 3 `tabularx` with the generated LaTeX rows; replace Figure 4 placeholder with `\includegraphics`.
+**Caveat:** because LOCA is misclassified to LOCAC in $95\%$ of cases, SHAP attributions averaged over true-LOCA windows will reflect the model's LOCAC-attractor behaviour. Either compute SHAP w.r.t. the predicted class (not the true class) — pass `--classes LOCAC SGATR SGBTR FLB` — or accept that the LOCA row of Table 3 will document a model failure rather than a model success. Both are valid, just be deliberate about which you report.
 
----
+### 2. Figure 1 — pipeline schematic
 
-## 2. Per-class F1 vs. class-frequency plot
+A hand-drawn diagram showing the three stages and the cross-validation loop. Author's choice of TikZ, `draw.io`, or `excalidraw`. Save as `paper/figures/fig1_pipeline.pdf` and replace the placeholder in `sections/03_methodology.tex`.
 
-**Paper target:** Figure 2 (`sec:results-clf`).
+### 3. Figure 8 — case studies
 
-**Script to write:** `scripts/plot_per_class_f1.py` (not included this turn — short matplotlib script).
+Did not generate in the Colab run. The script attempts to find:
+(i) correctly-classified LOCA with low κ,
+(ii) LOCA misclassified as LOCAC with elevated κ,
+(iii) correctly-classified ATWS with high κ.
+Cases (ii) and (iii) probably failed to find any windows because (a) LOCA $\rightarrow$ LOCAC misclassification dominates (so case (ii) should be easy — likely a save-path issue), and (b) ATWS may have zero correctly-classified windows in the test set. Re-run `pipeline_xvalidation.py`; if Figure 8 still does not appear, replace case (iii) with a different rare-class scenario or drop it. Lowest priority.
 
-**Inputs:** classifier evaluation output from `notebooks/04_evaluate_classification.ipynb` (per-class precision/recall/F1 + class counts from the training split).
+### 4. Optional re-run of Figure 7 with log-x axis
 
-**Output:** `paper/figures/fig2_f1_vs_frequency.pdf` — scatter of per-class F1 vs. `log10(n_train_windows)` with class labels annotated.
+`scripts/pipeline_xvalidation.py` was patched after the Colab run to use a log-log axis on the κ histogram, which surfaces the tail separation more clearly. The current `fig7_kappa_distributions.pdf` works but the new version will be more informative. Re-run takes ~1 minute on GPU.
 
----
+### 5. Table 4 — Data MSE row
 
-## 3. Confusion matrix plot
+The two `\placeholder{insert}` cells in Table 4 (§5.4) for normalized data MSE. Read off the final-epoch `val_mse` from each digital-twin training log, or compute on the test set with a small standalone script. Two scalar values to fill in.
 
-**Paper target:** Figure 3 (`sec:results-clf`).
+### 6. Bibliography pass
 
-**Script to write:** `scripts/plot_confusion.py`.
+Open verified entries on publisher pages and confirm full author lists for `zhang2023pinn`, `digitaltwin2025review`, `xgboost2026shap`. Decide what to do with the four still-flagged placeholder entries (`song2023calibration`, `santhosh2019survey`, `wang2023deep`, `lee2023lstm`) — replace with verified citations or remove the `\citep{}` calls in the prose.
 
-**Inputs:** predictions and labels from the LSTM classifier on the test set (export from notebook 04).
+### 7. Paper-text passes related to the actual results
 
-**Output:** `paper/figures/fig3_confusion.pdf` — 18×18 row-normalized heatmap with accident abbreviations on both axes.
+Now that the numbers are in, two passes worth doing:
 
----
-
-## 4. Trajectory comparison plot (physics vs. data-only)
-
-**Paper target:** Figure 5 (`sec:results-pinn`).
-
-**Script to write:** `scripts/plot_trajectory.py`.
-
-**Inputs:** both digital twin checkpoints (`digital_twin.yaml` and `digital_twin_no_physics.yaml`) + one representative LOCA test window + ground-truth continuation.
-
-**Output:** `paper/figures/fig5_trajectory_loca.pdf` — multi-panel plot, one panel per channel in {P, TAVG, WRCA, neutron_density_proxy}, overlaying physics-informed prediction, data-only baseline, and ground truth over the 10-step horizon.
+- **Abstract / introduction:** the abstract still says ``$71.2\%$ accuracy across 18 classes,'' which matches the Colab run ($71.9\%$ exact, rounds to $71.2$%). No change needed unless you want the more precise value.
+- **Discussion §6:** add a sentence acknowledging that the LOCA $\rightarrow$ LOCAC failure is a stronger story than ``LOCA/LOCAC confusion'' implied. This is a meaningful and honest finding: the model has learned to collapse two physically distinct accidents into one because the discriminating event (containment isolation) lies outside the 30-step window. Suggested follow-up: longer windows or hierarchical classifier (LOCA-class first, containment-state second).
 
 ---
 
-## 5. Physics-residual distribution histograms
+## Suggested final-mile order
 
-**Paper target:** Figure 6 (`sec:results-pinn`).
-
-**Script to write:** `scripts/plot_residual_histograms.py`.
-
-**Inputs:** per-window point-kinetics residual and conservation violation, computed with both models on the full test set.
-
-**Output:** `paper/figures/fig6_residual_histograms.pdf` — two-panel histogram (point kinetics | conservation) with log-y axis, physics-informed vs. data-only overlaid.
-
----
-
-## 6. Fill Data-MSE entry in Table 4
-
-**Paper target:** Table 4 row 3 (`sec:results-pinn`) — two `\placeholder{insert}` cells.
-
-**How:** read off `val_mse` from the final-epoch TensorBoard / training log of each digital-twin run. No new script needed.
-
----
-
-## 7. Pipeline cross-validation: κ distributions + precision/recall
-
-**Paper target:** Figure 7, Table 5, and the case studies of Figure 8 (`sec:results-pipeline`).
-
-**Script to write:** `scripts/pipeline_xvalidation.py`.
-
-**What it does:**
-1. Load trained stage-2 LSTM classifier and stage-3 physics-informed surrogate.
-2. Iterate the test set. For each window:
-   - Run the classifier → predicted class, correct/incorrect flag.
-   - Run the surrogate → predicted 10-step trajectory.
-   - Compute κ = normalized(w_pk · point_kinetics_residual + w_cons · conservation_residual), with normalization constants set so that the median κ on correctly classified validation windows is 1.
-3. Aggregate κ distributions conditional on correctness.
-4. Sweep κ* to find the F1-optimal threshold on the validation set, then report precision/recall on the test set at that threshold.
-5. Select three case-study windows (one per scenario in Figure 8 caption) and export their raw time series + SHAP maps + predicted trajectories.
-
-**Outputs:**
-- `results/pipeline/kappa_distributions.pdf` — Figure 7.
-- `results/pipeline/xvalidation_table.tex` — Table 5 fragment.
-- `results/pipeline/case_studies.pdf` — Figure 8.
-- `results/pipeline/kappa_stats.json` — Kolmogorov–Smirnov statistic and p-value for the `\placeholder{insert test statistic and p-value once computed}` sentence in `sec:results-pipeline`.
-
----
-
-## 8. Severity-stratified extrapolation experiment (optional, strengthens Section 6)
-
-**Paper target:** Discussion (`sec:discussion`) — strengthens the "physics as regularizer" claim.
-
-**What it does:** retrain the physics-informed surrogate and the data-only baseline on mild + moderate severity transients only, then evaluate on held-out severe transients. Measure the gap between the two models on this out-of-distribution split.
-
-**Script to write:** `scripts/train_digital_twin_severity_split.py` (wraps the existing training entry point with a custom scenario filter).
-
-**Outputs:** one extra column in Table 4 labelled "OOD (severe only)" showing the residual ratios under distribution shift. If the physics-informed model's advantage grows on OOD, that's a strong additional result to state in §6.1.
-
-**Status:** optional for the first submission; strongly recommended for a revision pass.
-
----
-
-## 9. Bibliography verification pass
-
-**Paper target:** `paper/references.bib` — 8 placeholder entries flagged via `note = {Placeholder...}`.
-
-**How:**
-- `zhang2023pinn` — the 2023 Nature Scientific Reports TL-PINN reactor transient paper. Look up exact authors, volume, article number, DOI.
-- `song2023calibration` — Song & Song autonomous-calibration paper. Verify venue and year.
-- `gong2022rom` — verified as Gong, Cheng, Chen et al., *Annals of Nuclear Energy* 179, 109443 (2022), DOI 10.1016/j.anucene.2022.109443. Originally keyed `gong2024rom`; renamed for accuracy.
-- `ayodeji2022dtwin` — review article title/authors; confirm they match the actual Progress in Nuclear Energy review you intend to cite.
-- `digitaltwin2025review` — 2025 digital-twin review; fill in authors and DOI.
-- `santhosh2019survey`, `wang2023deep`, `lee2023lstm` — replace with specific papers actually benchmarked in related-work. If the claims made in §2.1 need more specific evidence, swap in stronger individual citations (e.g., named CNN/LSTM NPPAD papers rather than generic placeholders).
-- `xgboost2026shap` — the January 2026 SHAP-XGBoost NPPAD paper referenced in §2.1. Find authors and DOI.
-
----
-
-## Suggested order of execution
-
-1. Items 1, 2, 3, 6 first — these use models you already trained and unblock Sections 5.2–5.3.
-2. Items 4, 5 next — re-run digital-twin evaluation to export per-window artifacts.
-3. Item 7 — requires items 1–5 to be in place; delivers the pipeline story.
-4. Item 9 in parallel with writing.
-5. Item 8 last, as a revision-grade result.
-
----
-
-## After all items are done
-
-1. `grep -rn "placeholder\|todo" paper/` should return empty.
-2. Compile `paper/main.tex` with pdfLaTeX + BibTeX end-to-end without warnings.
-3. Run a single spell/grammar pass on the full PDF.
-4. Draft the cover letter (separate file, not included in this `paper/` directory).
-5. Submit to Progress in Nuclear Energy (or Annals of Nuclear Energy as the stretch target).
+1. Run SHAP on Colab GPU → fill Table 3 + Figure 4.
+2. Make Figure 1 schematic.
+3. Re-run `pipeline_xvalidation.py` on Colab (gets log-axis Fig 7 + retry on Fig 8).
+4. Read Table 4 MSE values from logs, fill in.
+5. Bib pass, remove or replace the four still-flagged placeholders.
+6. `grep -rn "placeholder\|todo" paper/` → should be empty.
+7. Compile in Overleaf, proofread, submit.

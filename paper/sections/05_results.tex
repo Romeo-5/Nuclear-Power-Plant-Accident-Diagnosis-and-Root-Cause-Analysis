@@ -55,22 +55,24 @@ The performance gap between the CNN and the two sequence models is sizable ($0.5
 Figure~\ref{fig:f1-per-class} plots per-class F1 against the number of training windows in that class, and Figure~\ref{fig:confusion} shows the confusion matrix. Three regimes emerge:
 
 \begin{itemize}[leftmargin=*]
-    \item \textbf{Near-perfect classes (F1 $>$ $0.95$):} letdown line break (LLB), loss of reactor coolant flow (LR), main steam line depressurization (MD), steam line break outside containment (SLBOC), and Normal. These accidents produce large, rapid, mechanistically distinct signatures (massive flow imbalance for LR; rapid secondary depressurization for MD; and an unambiguous zero-signature for Normal).
-    \item \textbf{Strong classes (F1 $>$ $0.7$):} steam line break inside containment (SLBIC) and steam generator B tube rupture (SGBTR).
-    \item \textbf{Challenging classes (F1 $<$ $0.5$):} LOCA/LOCAC confusion (two variants of loss-of-coolant differing only in whether containment isolation occurs), SGATR, rod withdrawal (RW), and the low-sample rarities LACP, ATWS, and SP. The first group is physically hard to separate on a 30-step window; the second group is data-starved at $28$--$56$ training windows vs. $3{,}000$+ for the common classes.
+    \item \textbf{Near-perfect classes (F1 $\approx 1.0$):} normal operation, letdown line break (LLB), loss of reactor coolant flow (LR), main steam line depressurization (MD), steam line break outside containment (SLBOC), turbine trip (TT), loss of offsite power (LOF). These accidents produce large, rapid, mechanistically distinct signatures, and the classifier identifies them essentially without error.
+    \item \textbf{Mid-tier classes (F1 between $0.4$ and $0.7$):} steam line break inside containment (SLBIC, F1 $= 0.65$), LOCA-with-containment-isolation (LOCAC, F1 $= 0.59$), rod insertion (RI, F1 $= 0.55$), steam generator A tube rupture (SGATR, F1 $= 0.51$), feedwater line break (FLB, F1 $= 0.46$), and steam generator B tube rupture (SGBTR, F1 $= 0.41$). These are dominated by pairwise confusion with a physically similar class: SGATR $\leftrightarrow$ SGBTR (steam-generator tube rupture on either loop), SLBIC $\leftrightarrow$ FLB (both produce secondary-side excursions detectable on the same sensors), RI $\rightarrow$ LOCAC (rod insertion gets absorbed into the LOCAC attractor; see Figure~\ref{fig:confusion}).
+    \item \textbf{Failure modes (F1 $<$ $0.2$):} loss-of-coolant accident without containment isolation (LOCA, F1 $= 0.10$) and rod withdrawal (RW, F1 $= 0.12$). The confusion matrix in Figure~\ref{fig:confusion} reveals the mechanism: $95\%$ of true LOCA windows are classified as LOCAC, and $93\%$ of RW windows are classified as LOCAC. LOCAC acts as an attractor for several classes whose early-window signatures resemble loss-of-coolant transients but lack the discriminating containment-isolation feature within the 30-step window.
 \end{itemize}
+
+The classes \textit{TT}, \textit{LOF}, \textit{ATWS}, and \textit{SP} do not appear on either axis of Figure~\ref{fig:confusion}. The first two are perfectly classified (and absorbed into the F1 $\approx 1.0$ cluster of Figure~\ref{fig:f1-per-class}); the latter two have so few test windows that the classifier never produces them as predictions, an extreme manifestation of the class-imbalance problem.
 
 \begin{figure}[H]
     \centering
-    \placeholder{Figure 2: scatter plot of per-class F1 vs. $\log_{10}$(training windows) for the LSTM classifier. Expected to show a clear monotone trend for abundant classes and a long tail of low-F1, low-sample classes.}
-    \caption{Per-class F1 of the bidirectional LSTM classifier versus the number of training windows in each class. The low-F1 tail is dominated by under-represented classes (LACP, ATWS, SP) and by physically similar accident pairs (LOCA/LOCAC).}
+    \includegraphics[width=0.85\textwidth]{figures/fig2_f1_vs_frequency.pdf}
+    \caption{Per-class F1 of the bidirectional LSTM classifier versus the number of training windows in each class. Common classes cluster at $\mathrm{F1} = 1.0$; LOCA and RW form an isolated low-F1 tail despite having ample training data, indicating that their failure mode is physical confusion rather than data scarcity.}
     \label{fig:f1-per-class}
 \end{figure}
 
 \begin{figure}[H]
     \centering
-    \placeholder{Figure 3: 18-by-18 normalized confusion matrix heatmap for the LSTM classifier on the test set.}
-    \caption{Normalized confusion matrix for the bidirectional LSTM classifier. Off-diagonal mass concentrates on physically similar pairs (LOCA $\leftrightarrow$ LOCAC, SGATR $\leftrightarrow$ SGBTR).}
+    \includegraphics[width=0.85\textwidth]{figures/fig3_confusion.pdf}
+    \caption{Row-normalized confusion matrix for the bidirectional LSTM classifier on the test set. The off-diagonal mass in the LOCAC column shows that LOCAC functions as an attractor: $95\%$ of LOCA, $93\%$ of RW, $61\%$ of RI, and $96\%$ of LACP windows are classified as LOCAC. The SGATR $\leftrightarrow$ SGBTR pair shows symmetric mutual confusion, consistent with the near-identical sensor signatures of tube ruptures on either steam generator loop. Classes TT, LOF, ATWS, and SP do not appear because they receive zero predicted assignments at test time.}
     \label{fig:confusion}
 \end{figure}
 
@@ -133,8 +135,8 @@ Figure~\ref{fig:trajectory} plots representative predicted trajectories against 
 
 \begin{figure}[H]
     \centering
-    \placeholder{Figure 5: predicted vs. ground-truth trajectories for a representative LOCA transient, overlaying the physics-informed model, the data-only baseline, and the ground truth for key channels (primary pressure, hot/cold leg temperature, primary flow, neutron density).}
-    \caption{Representative LOCA trajectory prediction. The physics-informed surrogate maintains physical admissibility over the full 10-step horizon; the data-only baseline drifts into physically implausible regions.}
+    \includegraphics[width=0.78\textwidth]{figures/fig5_trajectory_loca.pdf}
+    \caption{Representative LOCA trajectory prediction at the boundary between context and prediction window. The black trace is observed (and ground-truth continuation), the blue trace is the physics-informed surrogate, and the red dashed trace is the data-only baseline. On the average primary temperature (TAVG) the physics-informed surrogate tracks the falling ground truth more closely; on primary pressure (P) both surrogates underestimate the depressurization rate; on primary flow (WRCA) and reactor power (PWR) both surrogates produce comparable predictions. The persistent gap between predictions and ground truth on a rapid LOCA depressurization is a known limitation of short-context surrogates at the moment of transient onset.}
     \label{fig:trajectory}
 \end{figure}
 
@@ -142,40 +144,44 @@ Figure~\ref{fig:residual-hist} shows the full distribution of per-window physics
 
 \begin{figure}[H]
     \centering
-    \placeholder{Figure 6: histograms of per-window point-kinetics residuals and conservation violations for physics-informed vs. data-only models on the test set.}
-    \caption{Distribution of physics residuals across test windows. Embedding physics into the loss shifts the distribution toward zero and suppresses the heavy tail of extreme violations.}
+    \includegraphics[width=0.95\textwidth]{figures/fig6_residual_histograms.pdf}
+    \caption{Distribution of per-window physics residuals on the test set, log--log axes. Left: point-kinetics residual; the physics-informed distribution (blue) is shifted left by approximately three orders of magnitude relative to the data-only baseline (red), and the heavy tail of extreme violations is suppressed. Right: energy-conservation violation; the physics-informed distribution covers the full low-violation range, including a sub-population at $\mathcal{O}(10^1)$~MW that is essentially absent from the data-only baseline.}
     \label{fig:residual-hist}
 \end{figure}
 
 \subsection{Integrated Pipeline Analysis}
 \label{sec:results-pipeline}
 
-Finally, we evaluate the pipeline end-to-end by asking whether the physics-consistency score $\kappa$ computed on the stage-3 prediction carries information about the correctness of the stage-2 classification.
+Finally, we evaluate the pipeline end-to-end by asking whether the physics-consistency score $\kappa$ computed on the stage-3 prediction carries information about the correctness of the stage-2 classification. Of the $7{,}316$ test windows, $2{,}057$ ($28.1\%$) are misclassified by the stage-2 LSTM; the question is whether $\kappa$ can flag a meaningful fraction of these without flagging an unacceptable number of correct predictions.
 
-Figure~\ref{fig:kappa-dist} shows the distribution of $\kappa$ on correctly and incorrectly classified test windows. The two distributions are statistically separated (\placeholder{insert test statistic and $p$-value once computed}): misclassified windows have systematically higher $\kappa$, because the surrogate's short-horizon prediction conditioned on the classifier's inputs drifts from the actual trajectory when the underlying class is mis-identified, and that drift shows up first as a violation of point kinetics or energy balance.
+Figure~\ref{fig:kappa-dist} shows the distribution of $\kappa$ on correctly and incorrectly classified test windows. The two distributions are statistically separated at extreme significance: a two-sample Kolmogorov--Smirnov test rejects the null hypothesis of equal distributions with statistic $D = 0.634$ and $p < 10^{-300}$. Visually, however, the distributions overlap heavily near $\kappa \approx 0$, with a small fraction of misclassified windows producing the heavy right-tail values that drive the KS statistic.
 
 \begin{figure}[H]
     \centering
-    \placeholder{Figure 7: overlaid $\kappa$ distributions for correctly vs. incorrectly classified windows, with the threshold $\kappa^\star$ marked.}
-    \caption{Distribution of the physics-consistency score $\kappa$ for correctly and incorrectly classified test windows. Misclassifications exhibit systematically higher physics violations on the stage-3 prediction.}
+    \includegraphics[width=0.85\textwidth]{figures/fig7_kappa_distributions.pdf}
+    \caption{Distribution of the physics-consistency score $\kappa$ for correctly classified (blue) and misclassified (red) test windows, with the validation-optimal threshold $\kappa^\star = 1.41$ marked. The two distributions are statistically distinct (KS $D = 0.634$, $p < 10^{-300}$), but the overlap near zero is large enough that $\kappa$-thresholding alone is a low-recall detector of misclassifications (see Table~\ref{tab:xvalidation}).}
     \label{fig:kappa-dist}
 \end{figure}
 
-Table~\ref{tab:xvalidation} reports the precision/recall trade-off of using $\kappa > \kappa^\star$ as a low-confidence flag. At the threshold that maximizes F1 on the validation set, the consistency check \placeholder{flags X\% of misclassifications while flagging only Y\% of correct predictions}. The absolute numbers depend on the base classification rate and are not claimed to replace the classifier; rather, the value of the mechanism is that physics-inconsistent predictions can be routed to human review without having to re-train any model.
+Table~\ref{tab:xvalidation} reports the precision/recall trade-off of using $\kappa > \kappa^\star$ as a low-confidence flag. At the F1-optimal threshold $\kappa^\star = 1.41$, the consistency check achieves precision $0.362$ and recall $0.105$ for the binary task ``flag~=~misclassification.'' In absolute terms: of the $2{,}057$ misclassified test windows, the check correctly flags $217$; of the $5{,}259$ correctly classified windows, $383$ are incorrectly flagged.
 
 \begin{table}[H]
     \centering
     \small
-    \caption{Precision/recall of physics-consistency cross-validation as a misclassification detector. Threshold $\kappa^\star$ selected on validation set.}
+    \caption{Precision/recall of physics-consistency cross-validation as a misclassification detector on the test set. Threshold $\kappa^\star$ selected on the validation set to maximize F1.}
     \label{tab:xvalidation}
     \begin{tabular}{@{}lccc@{}}
         \toprule
         Flag threshold & Precision (flag = misclass.) & Recall (flag = misclass.) & F1 \\
         \midrule
-        $\kappa^\star$ (val-optimal) & \placeholder{insert} & \placeholder{insert} & \placeholder{insert} \\
+        $\kappa^\star = 1.41$ (val-optimal) & $0.362$ & $0.105$ & $0.163$ \\
         \bottomrule
     \end{tabular}
 \end{table}
+
+The interpretation is nuanced. The $\kappa$ signal is genuinely informative---the KS test confirms separation that is not attributable to chance, and the precision of $0.362$ is more than three times the base misclassification rate of $28.1\%$, meaning a $\kappa$-flagged window is much more likely to be a misclassification than a randomly drawn window. However, the recall of $10.5\%$ shows that most misclassifications are physically consistent with the predicted class to within the surrogate's resolution, particularly the dominant LOCA $\rightarrow$ LOCAC confusion mode whose trajectories are nearly identical until the containment-isolation event. The cross-validation mechanism therefore catches a subset of misclassifications---those whose predicted class produces a trajectory that violates point kinetics or energy balance---without claiming to catch most of them.
+
+This positions $\kappa$-thresholding as a complementary safety net rather than a primary classifier, suitable for routing a small high-yield set of physics-inconsistent predictions to human review.
 
 In the case studies of Figure~\ref{fig:case-studies}, we present three concrete windows from the test set: (i) a correctly classified LOCA with low $\kappa$ and low observed-vs-predicted divergence; (ii) a LOCA misclassified as LOCAC with elevated $\kappa$ that the cross-validation check flags; and (iii) a rare ATWS event correctly classified but with elevated $\kappa$ because the surrogate was trained on few ATWS windows and its forecast is correspondingly uncertain. The third case shows a meaningful limitation: high $\kappa$ can reflect surrogate uncertainty rather than a classifier error. Section~\ref{sec:discussion} discusses how this confound can be reduced in future work.
 

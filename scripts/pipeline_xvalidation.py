@@ -228,14 +228,18 @@ def main() -> None:
     (out / "kappa_stats.json").write_text(json.dumps(stats, indent=2) + "\n")
     print(json.dumps(stats, indent=2))
 
-    # Figure 7: kappa distributions
+    # Figure 7: kappa distributions on log-x to surface the heavy-tail separation.
     fig, ax = plt.subplots(figsize=(6.5, 3.6), constrained_layout=True)
-    bins = np.linspace(0, np.quantile(kappa_t, 0.99) * 1.1, 60)
+    floor = max(np.min(kappa_t[kappa_t > 0]) if (kappa_t > 0).any() else 1e-3, 1e-3)
+    ceil = float(np.quantile(kappa_t, 0.995))
+    bins = np.logspace(np.log10(floor), np.log10(max(ceil, floor * 10)), 60)
     ax.hist(kappa_t[correct_t], bins=bins, alpha=0.5, label="Correctly classified", color="C0")
     ax.hist(kappa_t[~correct_t], bins=bins, alpha=0.5, label="Misclassified", color="C3")
     ax.axvline(thr, color="k", ls="--", lw=1, label=f"$\\kappa^* = {thr:.2f}$")
-    ax.set_xlabel(r"Physics-consistency score $\kappa$")
-    ax.set_ylabel("Test windows")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel(r"Physics-consistency score $\kappa$ (log scale)")
+    ax.set_ylabel("Test windows (log)")
     ax.legend(frameon=False)
     fig.savefig(out / "kappa_distributions.pdf")
     # Also drop a copy into paper/figures so it lands in the paper directly.

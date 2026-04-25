@@ -1,0 +1,102 @@
+\section{Methodology}
+\label{sec:method}
+
+Figure~\ref{fig:pipeline} gives a schematic overview of the integrated framework. A sliding window of 30 time steps over the 96 sensor channels is the common input representation. Stage 1 produces a binary anomaly flag, stage 2 produces an 18-class accident label plus per-sensor and per-timestep attributions, and stage 3 produces a ten-step forward trajectory prediction along with the scalar physics residuals attached to that prediction. The downstream consistency check combines the stage-2 label with the stage-3 trajectory, as detailed in Section~\ref{sec:integration}.
+
+\begin{figure}[H]
+    \centering
+    \placeholder{Figure 1: pipeline schematic. Boxes for modules 1--3 with arrows showing data flow; inset showing the cross-validation check between module 2 and module 3.}
+    \caption{Overview of the three-stage integrated framework. Stage 1 performs semi-supervised screening on normal-data-trained models. Stage 2 performs supervised 18-class classification with SHAP attribution. Stage 3 produces physics-informed short-horizon trajectory predictions that can be cross-checked against the stage-2 classification.}
+    \label{fig:pipeline}
+\end{figure}
+
+\subsection{Data Representation}
+\label{sec:data-rep}
+
+Raw \nppad{} recordings are resampled onto a uniform time grid and concatenated into per-scenario sequences of $96$ sensor channels covering primary-loop pressures, hot/cold-leg temperatures, coolant flow rates, reactor power, neutron flux, pressurizer level, steam generator levels and pressures, and boron concentration. Sequences are split by scenario into $70/15/15$ train/validation/test partitions to avoid leakage within a single transient. A standard scaler is fit on the normal-operation training subset only, and applied to all partitions.
+
+Sliding windows of length $T = 30$ time steps are drawn with stride $s_{\text{train}} = 10$ during training and $s_{\text{eval}} = 1$ during evaluation, yielding $32{,}284$ training windows and $7{,}316$ test windows. Each window is labelled with both a binary anomaly flag and the 18-way accident-type label of its parent scenario.
+
+\subsection{Stage 1: Semi-Supervised Anomaly Detection}
+\label{sec:anomaly}
+
+Stage 1 comprises three architectures trained only on the 28 normal-operation windows in the training set. Anomaly scores are derived from reconstruction or prediction error, and a decision threshold is tuned on validation data to maximize F1.
+
+\paragraph{Autoencoder.} A fully connected encoder--decoder with layer widths $96 \rightarrow 64 \rightarrow 32 \rightarrow 16 \rightarrow 32 \rightarrow 64 \rightarrow 96$, ReLU activations, and batch normalization reconstructs each timestep independently. The anomaly score for a window is the mean per-timestep mean-squared reconstruction error.
+
+\paragraph{LSTM next-step predictor.} A bidirectional LSTM with hidden size 128 is trained with teacher forcing to predict timestep $t+1$ from timesteps $1{:}t$. The anomaly score is the mean squared prediction error across the window.
+
+\paragraph{Masked Transformer reconstructor.} A Transformer encoder with sinusoidal positional encoding, three layers, and eight attention heads reconstructs a randomly masked $15\%$ of the timesteps in each training window. At inference, the model is asked to reconstruct every timestep, and the mean reconstruction error is used as the anomaly score.
+
+All three models are trained with Adam, a learning rate of $10^{-3}$, early stopping on validation loss with patience 10, and a batch size of 64.
+
+\subsection{Stage 2: Accident Classification with Root-Cause Attribution}
+\label{sec:classifier}
+
+Stage 2 is a supervised 18-class classifier operating on the same 30-step window representation. We train three architectures to assess how inductive bias affects performance on this imbalanced problem.
+
+\paragraph{1D-CNN classifier.} Three convolutional blocks ($96\rightarrow 64 \rightarrow 128 \rightarrow 256$ channels, kernel size 3, ReLU, batch normalization) feed into a global average pooling layer, a 128-unit fully connected layer, and an 18-way softmax head. Dropout of $0.3$ is applied before the final layer.
+
+\paragraph{Bidirectional LSTM classifier.} A two-layer bidirectional LSTM with hidden size 128 is unrolled over the 30-step window. The final hidden states from both directions are concatenated ($256$ units), passed through a 128-unit fully connected layer with dropout, and then into the softmax head.
+
+\paragraph{Transformer classifier.} A learnable \texttt{[CLS]} token is prepended to the window, positional encodings are added, and three encoder layers (model dimension 128, eight heads, feed-forward dimension 512) attend over the sequence. The final \texttt{[CLS]} representation is passed through LayerNorm, a 128-unit linear layer with ReLU and dropout, and the softmax head.
+
+All classifiers are trained with cross-entropy loss, Adam, early stopping with patience 15, and learning rates $10^{-3}$ for CNN/LSTM and $5 \times 10^{-4}$ for the Transformer.
+
+\paragraph{Root-cause attribution.} We compute two complementary attribution signals on the best-performing classifier. SHAP values~\citep{lundberg2017shap} are computed with the \texttt{DeepExplainer} backend using a 100-window background sample drawn from the training set. This yields a per-sample tensor of shape $(T \times F)$ assigning an importance score to every (timestep, sensor) pair. We additionally compute input-$\times$-gradient attributions as a faster alternative for large-scale analyses. Per-class feature importance is obtained by averaging absolute SHAP values over all test samples of that class; per-class temporal importance is obtained by averaging over sensors. In Section~\ref{sec:results-shap} we map the top-ranked sensors of representative classes onto physical parameter groups (primary pressure, coolant flow, steam generator secondary side, \textit{etc.}) and compare against the known mechanistic signature of each accident.
+
+\subsection{Stage 3: Physics-Informed Trajectory Prediction}
+\label{sec:pinn}
+
+Stage 3 is a GRU encoder--decoder surrogate trained under a composite physics-informed loss. Given a context window of $T_c = 20$ time steps, the model predicts the next $T_p = 10$ time steps of all 96 sensor channels.
+
+\subsubsection{Architecture}
+
+The encoder is a two-layer GRU with hidden size 128 that ingests the context window and produces a final hidden state $\mathbf{h}_{T_c}$. The decoder is an autoregressive GRU initialized from $\mathbf{h}_{T_c}$ that emits, at each decode step $k = 1, \dots, T_p$, a delta vector $\Delta \hat{\mathbf{x}}_k \in \mathbb{R}^{96}$ via a linear projection. The predicted state is obtained by a residual connection
+\begin{equation}
+    \hat{\mathbf{x}}_{T_c + k} = \mathbf{x}_{T_c} + \sum_{j = 1}^{k} \Delta \hat{\mathbf{x}}_j,
+    \label{eq:residual}
+\end{equation}
+which biases the model towards the local linearization of the dynamics and stabilizes autoregressive roll-outs. The total parameter count is $384$K, small enough for real-time inference on a CPU.
+
+\subsubsection{Physics-Informed Loss}
+
+The training loss combines four terms:
+\begin{equation}
+    \mathcal{L}(\theta) = \lambda_{\text{data}} \mathcal{L}_{\text{data}} + w(t)\bigl[\lambda_{\text{pk}} \mathcal{L}_{\text{pk}} + \lambda_{\text{cons}} \mathcal{L}_{\text{cons}}\bigr] + \lambda_{\text{bnd}} \mathcal{L}_{\text{bnd}},
+    \label{eq:loss}
+\end{equation}
+where $w(t)$ is a linear warmup schedule ramping from $0$ to $1$ over the first $500$ training steps. We set $\lambda_{\text{data}} = 1.0$, $\lambda_{\text{pk}} = 0.1$, $\lambda_{\text{cons}} = 0.05$, $\lambda_{\text{bnd}} = 0.01$.
+
+\paragraph{Data term.} $\mathcal{L}_{\text{data}}$ is the mean-squared error between predicted and true sensor trajectories in the standard-scaler-normalized space.
+
+\paragraph{Point-kinetics residual.} Let $n(t)$ denote the predicted neutron density channel and let $T_{\text{avg}}(t)$ and $C_{\text{B}}(t)$ denote the predicted coolant average temperature and boron concentration. A simplified point kinetics model assumes
+\begin{equation}
+    \frac{dn}{dt} = \frac{\rho(t)}{\Lambda} n(t),
+    \qquad
+    \rho(t) = \alpha_T (T_{\text{avg}}(t) - T_{\text{ref}}) + \alpha_B (C_{\text{B}}(t) - C_{\text{B,ref}}),
+    \label{eq:point-kinetics}
+\end{equation}
+with prompt neutron generation time $\Lambda = 2.0 \times 10^{-5}$~s, temperature coefficient $\alpha_T = -2.0 \times 10^{-4}$~$\Delta k/k$/\textdegree{}C, boron coefficient $\alpha_B = -1.0 \times 10^{-4}$~$\Delta k/k$/ppm, reference temperature $T_{\text{ref}} = 310$~\textdegree{}C, and reference boron concentration $C_{\text{B,ref}} = 200$~ppm, consistent with standard large-PWR parameters~\citep{duderstadt1976nuclear}. The residual is the squared error between the finite-difference time derivative of the predicted $n(t)$ and the right-hand side of Eq.~\eqref{eq:point-kinetics} evaluated on the prediction, averaged over the prediction horizon and normalized by a characteristic neutron density scale.
+
+\paragraph{Energy-conservation residual.} At steady state, core thermal power $Q$ is related to primary loop flow $W$, coolant specific heat $c_p = 5.5$~kJ/kg/\textdegree{}C, and the hot/cold leg temperature difference $\Delta T = T_{\text{hot}} - T_{\text{cold}}$ via
+\begin{equation}
+    Q \approx W \, c_p \, \Delta T.
+    \label{eq:conservation}
+\end{equation}
+Using the predicted values of $Q$, $W$, $T_{\text{hot}}$, and $T_{\text{cold}}$, $\mathcal{L}_{\text{cons}}$ is the squared residual of Eq.~\eqref{eq:conservation} normalized by a characteristic power scale. During rapid transients Eq.~\eqref{eq:conservation} does not hold exactly, but its inclusion as a soft penalty biases the surrogate towards quasi-steady energy balance, which is physically correct on sufficiently long time scales.
+
+\paragraph{Physical-bounds penalty.} For each channel in a predefined set (pressures, power, temperatures, flow rates, boron concentration), $\mathcal{L}_{\text{bnd}}$ applies a one-sided quadratic penalty whenever the prediction falls below the physically admissible floor.
+
+\subsubsection{Solver}
+
+Where the point-kinetics residual is integrated rather than differentiated during evaluation, we use a fully differentiable fourth-order Runge--Kutta integrator implemented in PyTorch, enabling gradient flow through physical rollouts if desired for future extensions.
+
+\subsection{Pipeline Integration and Cross-Validation}
+\label{sec:integration}
+
+At deployment, a new sliding window enters the pipeline and is first passed through stage 1. If stage 1 flags the window as anomalous, it is forwarded to stage 2 for 18-class classification and to stage 3 for trajectory prediction. Stage 2 also returns SHAP attributions for the predicted class. Stage 3 returns the 10-step forecast together with the associated point-kinetics and conservation residuals evaluated on the prediction.
+
+We define a \emph{physics-consistency score} $\kappa$ as a weighted sum of the point-kinetics residual and the conservation violation on the predicted trajectory, normalized so that $\kappa \approx 1$ corresponds to the median residual observed on correctly classified test windows and larger values correspond to worse physical consistency. A threshold $\kappa^\star$ is calibrated on the validation set; windows for which $\kappa > \kappa^\star$ are flagged as low-confidence classifications and escalated for human review.
+
+This mechanism is conservative: it does not attempt to correct the classifier, but it provides an auditable, physics-grounded signal that can reduce the rate of silent misclassification. Section~\ref{sec:results-pipeline} evaluates the effectiveness of this consistency check empirically.

@@ -1,0 +1,55 @@
+\section{Experimental Setup}
+\label{sec:setup}
+
+\subsection{Dataset and Preprocessing}
+
+All experiments use the Nuclear Power Plant Accident Dataset (\nppad)~\citep{qi2022nppad}, which contains simulated time-series sensor data from PCTRAN, a validated PWR simulator widely used for operator training. The dataset covers one normal operating condition and 17 accident scenarios, each recorded at multiple severity levels, for a total of 18 class labels used in this study. The accident types and their abbreviations are summarized in Table~\ref{tab:accidents}.
+
+\begin{table}[H]
+    \centering
+    \small
+    \caption{Accident types in \nppad{} used in this study.}
+    \label{tab:accidents}
+    \begin{tabular}{@{}ll@{}}
+        \toprule
+        Abbreviation & Description \\
+        \midrule
+        Normal & Normal operating conditions \\
+        LOCA & Loss-of-coolant accident (cold leg) \\
+        LOCAC & Loss-of-coolant accident (cold leg, containment) \\
+        SLBIC & Steam line break inside containment \\
+        SLBOC & Steam line break outside containment \\
+        SGATR & Steam generator A tube rupture \\
+        SGBTR & Steam generator B tube rupture \\
+        FLB & Feedwater line break \\
+        LLB & Letdown line break \\
+        RW & Rod withdrawal \\
+        RI & Rod insertion \\
+        LR & Loss of reactor coolant flow \\
+        TT & Turbine trip \\
+        MD & Main steam line depressurization \\
+        LOF & Loss of offsite power (partial) \\
+        LACP & Loss of AC power \\
+        ATWS & Anticipated transient without scram \\
+        SP & Spurious pressurizer spray \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Raw recordings are aggregated into 96 sensor channels covering primary and secondary side thermodynamics, neutron kinetics, and control variables. Scenarios are partitioned $70/15/15$ into train/validation/test splits so that all windows from a single transient fall into the same partition. A \texttt{StandardScaler} is fit on the normal-operation training subset only to avoid information leakage from accident trajectories, and applied to all partitions.
+
+Sliding windows of length 30 with stride 10 during training and stride 1 during evaluation yield $32{,}284$ training windows, $7{,}316$ validation windows, and $7{,}316$ test windows. The stage-1 anomaly detectors additionally use only the $28$ normal-class training windows for fitting. The stage-3 surrogate further splits each 30-step window into a 20-step context and a 10-step prediction target.
+
+\subsection{Training Protocol}
+
+All models are implemented in PyTorch 2.x and trained on Apple M-series hardware using the MPS backend. We use the Adam optimizer with learning rate $1 \times 10^{-3}$ for stage-1 models and the CNN/LSTM classifiers, $5 \times 10^{-4}$ for the Transformer classifier and the stage-3 surrogate, batch size 64, and weight decay $10^{-4}$. Early stopping is applied on the validation loss with patience 10 for stage 1 and patience 15 for stages 2 and 3. Stage-3 training runs for up to 150 epochs; the physics-loss warmup schedule covers the first $500$ optimizer steps. Model checkpoints selected by best validation loss are used for all test-set evaluation. Random seeds are fixed for data partitioning, model initialization, and SHAP background sampling.
+
+\subsection{Evaluation Metrics}
+
+\paragraph{Stage 1.} We report precision, recall, F1 score, area under the ROC curve (AUROC), and area under the precision--recall curve (AUPRC) on test windows, using a decision threshold optimized to maximize F1 on the validation set.
+
+\paragraph{Stage 2.} We report overall accuracy, macro-F1, weighted-F1, macro-precision, and macro-recall on the 18-class problem. Per-class F1 and a full confusion matrix are analyzed to understand failure modes. For attribution, we report mean absolute SHAP value per sensor per class, aggregated over all test windows of that class, and map the top sensors onto physical parameter groups.
+
+\paragraph{Stage 3.} We report the per-window MSE of the predicted trajectory against the ground truth, the mean point-kinetics residual of Eq.~\eqref{eq:point-kinetics} evaluated on the predicted trajectory, and the mean energy-conservation violation of Eq.~\eqref{eq:conservation}. The physics-informed model is compared against an identical architecture trained with the physics loss disabled (\textit{i.e.,} $\lambda_{\text{pk}} = \lambda_{\text{cons}} = \lambda_{\text{bnd}} = 0$).
+
+\paragraph{Pipeline.} The end-to-end pipeline is evaluated on correctly and incorrectly classified test windows separately. We report the distribution of the physics-consistency score $\kappa$ conditional on classification correctness and the achievable precision/recall trade-off of using $\kappa$ as a low-confidence flag.

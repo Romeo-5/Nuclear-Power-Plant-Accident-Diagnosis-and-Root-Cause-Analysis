@@ -1,0 +1,71 @@
+\documentclass[11pt,a4paper]{article}
+
+% ---------- Packages ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{siunitx}
+\usepackage{hyperref}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{xcolor}
+\usepackage{authblk}
+\usepackage{microtype}
+\usepackage{enumitem}
+\usepackage{tabularx}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  citecolor=blue,
+  urlcolor=blue
+}
+
+% ---------- Custom macros ----------
+\newcommand{\nppad}{NPPAD\xspace}
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+\newcommand{\placeholder}[1]{\textcolor{orange}{[#1]}}
+\usepackage{xspace}
+
+% ---------- Title ----------
+\title{\textbf{An Integrated Deep Learning Framework for Nuclear Reactor Fault Diagnosis: From Semi-Supervised Anomaly Detection to Physics-Informed Accident Prognosis}}
+
+\author[1]{Romeo Nickel}
+\affil[1]{\textit{Affiliation TBD}}
+
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Reliable fault diagnosis in nuclear power plants requires a cascading chain of decisions: detecting that an anomaly has occurred, identifying what type of accident is underway, and predicting how the reactor state will evolve. Existing machine learning approaches for nuclear fault diagnosis typically address these tasks independently, limiting their utility for integrated digital-twin deployments where diagnostic outputs must be physically consistent across stages. This paper presents a unified three-stage deep learning framework for pressurized water reactor (PWR) fault diagnosis, evaluated on the Nuclear Power Plant Accident Dataset (\nppad) comprising 96 sensor parameters across 18 operating conditions. In the first stage, semi-supervised anomaly detectors (autoencoder, LSTM, and Transformer) trained exclusively on normal operating data achieve near-perfect detection performance ($\mathrm{F1} \approx 0.9995$, $\mathrm{AUROC} \geq 0.985$) on 7{,}316 test windows. In the second stage, a bidirectional LSTM classifier identifies the specific accident type with $71.2\%$ accuracy across 18 classes, with SHAP-based attribution analysis providing per-sensor and per-timestep root-cause information. In the third stage, a physics-informed GRU encoder--decoder surrogate ($384$K parameters), constrained by point kinetics equations and energy conservation laws, predicts 10-step reactor trajectories with $68.6\%$ lower point-kinetics residuals and $39.6\%$ fewer energy-conservation violations than an otherwise-identical data-only baseline. The integration of these stages enables a complete diagnostic pipeline in which physics-informed predictions cross-validate data-driven classifications, demonstrating a viable architecture for nuclear digital-twin monitoring systems.
+\end{abstract}
+
+\noindent\textbf{Keywords:} nuclear power plant, fault diagnosis, anomaly detection, physics-informed neural network, digital twin, SHAP, deep learning, pressurized water reactor
+
+\input{sections/01_introduction}
+\input{sections/02_related_work}
+\input{sections/03_methodology}
+\input{sections/04_experimental_setup}
+\input{sections/05_results}
+\input{sections/06_discussion}
+\input{sections/07_conclusion}
+
+% ---------- Acknowledgements ----------
+\section*{Acknowledgements}
+\placeholder{Acknowledgements and funding sources TBD.}
+
+% ---------- References ----------
+\bibliographystyle{unsrtnat}
+\bibliography{references}
+
+\end{document}

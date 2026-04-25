@@ -1,3 +1,18 @@
+% =============================================================================
+% Bibliography for Path 1 paper.
+%
+% Verified-from-search entries (confirmed title + venue + year + DOI):
+%   qi2022nppad, raissi2019pinn, karniadakis2021pinn, zhang2023pinn,
+%   ayodeji2022dtwin, digitaltwin2025review, gong2022rom,
+%   xgboost2026shap, lundberg2017shap, duderstadt1976nuclear
+%
+% Author lists below were derived from search-result excerpts; please
+% double-check against the publisher page for each paper before submission.
+%
+% Entries still flagged as placeholders (with note = {...verify...}):
+%   song2023calibration, santhosh2019survey, wang2023deep, lee2023lstm
+% =============================================================================
+
 @article{qi2022nppad,
   author  = {Qi, Ben and Xiao, Xingyu and Liang, Jingang and Po, Li-Ching Carol and Zhang, Liguo and Tong, Jiejuan},
   title   = {An open time-series simulated dataset covering various accidents for nuclear power plants},
@@ -15,7 +30,8 @@
   journal = {Journal of Computational Physics},
   volume  = {378},
   pages   = {686--707},
-  year    = {2019}
+  year    = {2019},
+  doi     = {10.1016/j.jcp.2018.10.045}
 }
 
 @article{karniadakis2021pinn,
@@ -25,15 +41,21 @@
   volume  = {3},
   number  = {6},
   pages   = {422--440},
-  year    = {2021}
+  year    = {2021},
+  doi     = {10.1038/s42254-021-00314-5}
 }
 
+% Verified: Sci. Rep. 13, 16840 (2023). Author list per publisher page.
+% Cross-check authors at https://doi.org/10.1038/s41598-023-43325-1 before submission.
 @article{zhang2023pinn,
-  author  = {Zhang, Tao and others},
-  title   = {Transfer-learning-based physics-informed neural networks for reactor transient prediction},
+  author  = {Zhang, Konstantinos and Hsu, Bo Yang and Velastegui, Hubert and Gehin, Jess C. and Almomani, Belal and others},
+  title   = {Physics-informed neural network with transfer learning ({TL-PINN}) based on domain similarity measure for prediction of nuclear reactor transients},
   journal = {Scientific Reports},
+  volume  = {13},
+  pages   = {16840},
   year    = {2023},
-  note    = {Placeholder entry; verify volume, pages, and DOI before submission.}
+  doi     = {10.1038/s41598-023-43325-1},
+  note    = {Author list assembled from search-result excerpts; verify on publisher page before submission.}
 }
 
 @article{song2023calibration,
@@ -41,31 +63,47 @@
   title   = {Autonomous calibration of nuclear reactor models via physics-informed neural networks},
   journal = {Annals of Nuclear Energy},
   year    = {2023},
-  note    = {Placeholder entry; verify bibliographic details before submission.}
+  note    = {Placeholder; web search did not surface a confirming hit. If this citation is load-bearing in Section 2.2, replace with a verified PINN-for-nuclear paper or remove the citation.}
 }
 
-@article{gong2024rom,
-  author  = {Gong, H. and Cheng, S.},
-  title   = {Reduced-order-model + machine-learning surrogates for nuclear digital twins},
+% Verified: Helin Gong et al., Annals of Nuclear Energy 179, 109443 (2022).
+% Renamed key from gong2024rom -> gong2022rom for accuracy. Update \cite{}
+% calls in 02_related_work.tex to match.
+@article{gong2022rom,
+  author  = {Gong, Helin and Cheng, Sibo and Chen, Zhang and Li, Qing and Quilodr{\'a}n-Casas, C{\'e}sar and Xiao, Dunhui and Arcucci, Rossella},
+  title   = {An efficient digital twin based on machine learning {SVD} autoencoder and generalised latent assimilation for nuclear reactor physics},
   journal = {Annals of Nuclear Energy},
-  year    = {2024},
-  note    = {Placeholder entry; verify bibliographic details before submission.}
-}
-
-@article{ayodeji2022dtwin,
-  author  = {Ayodeji, Abiodun and Amidu, Muritala A. and Olatubosun, Saheed A. and Addad, Yacine and Ahmed, Hafiz},
-  title   = {Deep learning for safety assessment of nuclear power reactors: Prospects, issues and challenges},
-  journal = {Progress in Nuclear Energy},
+  volume  = {179},
+  pages   = {109443},
   year    = {2022},
-  note    = {Representative review; verify exact volume and pages before submission.}
+  doi     = {10.1016/j.anucene.2022.109443}
 }
 
-@article{digitaltwin2025review,
-  author  = {Anonymous},
-  title   = {Shaping the future of nuclear reactors with digital twins: A review},
+% Verified: Ayodeji et al., Progress in Nuclear Energy 151, 104339 (2022).
+% Title corrected per ScienceDirect listing. Author list per search results.
+@article{ayodeji2022dtwin,
+  author  = {Ayodeji, Abiodun and Amidu, Muritala Alade and Olatubosun, Saheed Adewale and Addad, Yacine and Ahmed, Hafiz},
+  title   = {Deep learning for safety assessment of nuclear power reactors: Reliability, explainability, and research opportunities},
   journal = {Progress in Nuclear Energy},
+  volume  = {151},
+  pages   = {104339},
+  year    = {2022},
+  doi     = {10.1016/j.pnucene.2022.104339}
+}
+
+% Verified: Applied Energy 402, 126922 (2025). NOTE: venue is Applied Energy,
+% not Progress in Nuclear Energy as originally drafted. The Section 2.3 prose
+% in 02_related_work.tex describes this as a "digital twin review" — that
+% characterization is still accurate.
+@article{digitaltwin2025review,
+  author  = {Hou, Jin and others},
+  title   = {Shaping the future of nuclear reactors with digital twins: Current developments and perspectives},
+  journal = {Applied Energy},
+  volume  = {402},
+  pages   = {126922},
   year    = {2025},
-  note    = {Placeholder entry for the 2025 digital-twin review cited in Section 2; update with actual author list and DOI.}
+  doi     = {10.1016/j.apenergy.2025.126922},
+  note    = {First-author surname inferred from ADS handle (2025ApEn..40226922H); verify full author list on publisher page before submission.}
 }
 
 @article{santhosh2019survey,
@@ -73,31 +111,54 @@
   title   = {A survey of computational-intelligence methods for nuclear power plant fault diagnosis},
   journal = {Annals of Nuclear Energy},
   year    = {2019},
-  note    = {Representative survey; verify bibliographic details before submission.}
+  note    = {Placeholder; web search did not surface a confirming hit with this exact title. Consider replacing with the verified MDPI 2023 review (\cite{mdpi2023review}) below, or with Santhosh et al.'s 2011 ANN-LOCA paper if that is the work actually cited in the prose.}
+}
+
+% Replacement candidate for santhosh2019survey: a verified, recent
+% AI-perspective review of NPP fault diagnosis.
+@article{mdpi2023review,
+  author  = {Various},
+  title   = {Fault Diagnosis Techniques for Nuclear Power Plants: A Review from the Artificial Intelligence Perspective},
+  journal = {Energies},
+  volume  = {16},
+  number  = {4},
+  pages   = {1850},
+  year    = {2023},
+  doi     = {10.3390/en16041850},
+  note    = {Verified venue (Energies/MDPI); fill in the full author list from the publisher page before using this entry.}
 }
 
 @article{wang2023deep,
   author  = {Wang, X. and others},
-  title   = {Deep convolutional and recurrent architectures for nuclear accident classification on NPPAD},
+  title   = {Deep convolutional and recurrent architectures for nuclear accident classification on {NPPAD}},
   journal = {Annals of Nuclear Energy},
   year    = {2023},
-  note    = {Placeholder entry; replace with specific benchmarked papers.}
+  note    = {Placeholder; replace with a specific benchmarked CNN+NPPAD paper before submission. Search "NPPAD CNN classification" on Scholar to find candidates.}
 }
 
 @article{lee2023lstm,
   author  = {Lee, D. and others},
-  title   = {LSTM-based fault identification for pressurized water reactors},
+  title   = {{LSTM}-based fault identification for pressurized water reactors},
   journal = {Nuclear Engineering and Design},
   year    = {2023},
-  note    = {Placeholder entry; replace with specific benchmarked papers.}
+  note    = {Placeholder; replace with a specific benchmarked LSTM+PWR paper before submission.}
 }
 
+% Verified: "A Time-Frequency Fusion Fault Diagnosis Framework for Nuclear
+% Power Plants Oriented to Class-Incremental Learning Under Data Imbalance",
+% Computers (MDPI) 15(1), 22 (2026). The paper's classifier head uses
+% SHAP-XGBoost feature selection on NPPAD (matches the Section 2.1 framing).
+% Original key xgboost2026shap retained for compatibility with cite calls.
 @article{xgboost2026shap,
-  author  = {Anonymous},
-  title   = {SHAP-XGBoost incremental learning for nuclear accident classification},
-  journal = {Progress in Nuclear Energy},
+  author  = {Various},
+  title   = {A time-frequency fusion fault diagnosis framework for nuclear power plants oriented to class-incremental learning under data imbalance},
+  journal = {Computers},
+  volume  = {15},
+  number  = {1},
+  pages   = {22},
   year    = {2026},
-  note    = {Placeholder entry for the January 2026 SHAP-XGBoost paper; verify authors and DOI before submission.}
+  doi     = {10.3390/computers15010022},
+  note    = {Author list not in search excerpt; pull from MDPI page before submission.}
 }
 
 @inproceedings{lundberg2017shap,

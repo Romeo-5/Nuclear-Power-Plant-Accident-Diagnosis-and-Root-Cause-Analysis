@@ -138,7 +138,7 @@ python scripts/shap_physics_validation.py \
 **How:**
 - `zhang2023pinn` — the 2023 Nature Scientific Reports TL-PINN reactor transient paper. Look up exact authors, volume, article number, DOI.
 - `song2023calibration` — Song & Song autonomous-calibration paper. Verify venue and year.
-- `gong2024rom` — Gong & Cheng ROM + ML digital twin paper. Verify.
+- `gong2022rom` — verified as Gong, Cheng, Chen et al., *Annals of Nuclear Energy* 179, 109443 (2022), DOI 10.1016/j.anucene.2022.109443. Originally keyed `gong2024rom`; renamed for accuracy.
 - `ayodeji2022dtwin` — review article title/authors; confirm they match the actual Progress in Nuclear Energy review you intend to cite.
 - `digitaltwin2025review` — 2025 digital-twin review; fill in authors and DOI.
 - `santhosh2019survey`, `wang2023deep`, `lee2023lstm` — replace with specific papers actually benchmarked in related-work. If the claims made in §2.1 need more specific evidence, swap in stronger individual citations (e.g., named CNN/LSTM NPPAD papers rather than generic placeholders).
